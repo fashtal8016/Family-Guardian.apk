@@ -1,0 +1,6 @@
+{
+  "name": "Family Guardian",
+  "description": "سامانه مدیریت و مراقبت خانواده برای نظارت بر موقعیت، ارتباط امن، تبادل پیام و هشدارهای اضطراری",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

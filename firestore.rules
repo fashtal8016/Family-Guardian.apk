@@ -1,0 +1,165 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- Entity Validators ---
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() <= 100 &&
+             data.email is string && data.email.size() <= 200 &&
+             data.role in ['parent', 'child'] &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('updatedAt' in data) || data.updatedAt == null || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    function isValidFamilyLink(data) {
+      return data.parentId is string && data.parentId.size() <= 128 &&
+             data.childId is string && data.childId.size() <= 128 &&
+             data.childName is string && data.childName.size() <= 100 &&
+             data.pairingCode is string && data.pairingCode.size() <= 20 &&
+             data.status in ['active', 'pending', 'unlinked'] &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('deviceModel' in data) || data.deviceModel == null || (data.deviceModel is string && data.deviceModel.size() <= 100)) &&
+             (!('batteryLevel' in data) || data.batteryLevel == null || (data.batteryLevel is int && data.batteryLevel >= 0 && data.batteryLevel <= 100)) &&
+             (!('isOnline' in data) || data.isOnline == null || data.isOnline is bool) &&
+             (!('isSharingLocation' in data) || data.isSharingLocation == null || data.isSharingLocation is bool) &&
+             (!('locationPermissionStatus' in data) || data.locationPermissionStatus == null || (data.locationPermissionStatus is string && data.locationPermissionStatus.size() <= 50)) &&
+             (!('gpsEnabled' in data) || data.gpsEnabled == null || data.gpsEnabled is bool) &&
+             (!('lastSeen' in data) || data.lastSeen == null || (data.lastSeen is timestamp && data.lastSeen <= request.time)) &&
+             (!('updatedAt' in data) || data.updatedAt == null || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    function isValidLocationRecord(data) {
+      return data.parentId is string && data.parentId.size() <= 128 &&
+             data.childId is string && data.childId.size() <= 128 &&
+             data.latitude is number && data.latitude >= -90.0 && data.latitude <= 90.0 &&
+             data.longitude is number && data.longitude >= -180.0 && data.longitude <= 180.0 &&
+             data.accuracy is number && data.accuracy >= 0.0 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('provider' in data) || data.provider == null || (data.provider is string && data.provider.size() <= 50)) &&
+             (!('speed' in data) || data.speed == null || data.speed is number) &&
+             (!('recordedAt' in data) || data.recordedAt == null || (data.recordedAt is timestamp && data.recordedAt <= request.time));
+    }
+
+    function isValidChatMessage(data) {
+      return data.parentId is string && data.parentId.size() <= 128 &&
+             data.childId is string && data.childId.size() <= 128 &&
+             data.senderType in ['parent', 'child'] &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 2000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('isRead' in data) || data.isRead == null || data.isRead is bool) &&
+             (!('timestamp' in data) || data.timestamp == null || (data.timestamp is timestamp && data.timestamp <= request.time));
+    }
+
+    function isValidLocationRequest(data) {
+      return data.parentId is string && data.parentId.size() <= 128 &&
+             data.childId is string && data.childId.size() <= 128 &&
+             data.status in ['pending', 'fulfilled', 'rejected', 'gps_disabled', 'permission_denied'] &&
+             data.requestedAt is timestamp && data.requestedAt <= request.time &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             (!('message' in data) || data.message == null || (data.message is string && data.message.size() <= 500)) &&
+             (!('fulfilledAt' in data) || data.fulfilledAt == null || (data.fulfilledAt is timestamp && data.fulfilledAt <= request.time)) &&
+             (!('updatedAt' in data) || data.updatedAt == null || (data.updatedAt is timestamp && data.updatedAt <= request.time));
+    }
+
+    // --- Collections ---
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId &&
+                       incoming().userId == userId &&
+                       isValidUserProfile(incoming());
+      allow update: if isSignedIn() && request.auth.uid == userId &&
+                       incoming().userId == userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidUserProfile(incoming());
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /family_links/{linkId} {
+      allow get: if isSignedIn() &&
+                    (resource.data.parentId == request.auth.uid || resource.data.childId == request.auth.uid);
+      allow list: if isSignedIn() &&
+                     (resource.data.parentId == request.auth.uid || resource.data.childId == request.auth.uid);
+      allow create: if isSignedIn() &&
+                       (incoming().parentId == request.auth.uid || incoming().childId == request.auth.uid) &&
+                       isValidFamilyLink(incoming());
+      allow update: if isSignedIn() &&
+                       (existing().parentId == request.auth.uid || existing().childId == request.auth.uid) &&
+                       incoming().parentId == existing().parentId &&
+                       incoming().childId == existing().childId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidFamilyLink(incoming());
+      allow delete: if isSignedIn() && existing().parentId == request.auth.uid;
+    }
+
+    match /locations/{locationId} {
+      allow get: if isSignedIn() &&
+                    (resource.data.parentId == request.auth.uid || resource.data.childId == request.auth.uid);
+      allow list: if isSignedIn() &&
+                     (resource.data.parentId == request.auth.uid || resource.data.childId == request.auth.uid);
+      allow create: if isSignedIn() &&
+                       (incoming().childId == request.auth.uid || incoming().parentId == request.auth.uid) &&
+                       isValidLocationRecord(incoming());
+      allow update: if false; // Location records are append-only audit trail
+      allow delete: if isSignedIn() && existing().parentId == request.auth.uid;
+    }
+
+    match /messages/{messageId} {
+      allow get: if isSignedIn() &&
+                    (resource.data.parentId == request.auth.uid || resource.data.childId == request.auth.uid);
+      allow list: if isSignedIn() &&
+                     (resource.data.parentId == request.auth.uid || resource.data.childId == request.auth.uid);
+      allow create: if isSignedIn() &&
+                       (incoming().parentId == request.auth.uid || incoming().childId == request.auth.uid) &&
+                       isValidChatMessage(incoming());
+      allow update: if isSignedIn() &&
+                       (existing().parentId == request.auth.uid || existing().childId == request.auth.uid) &&
+                       incoming().parentId == existing().parentId &&
+                       incoming().childId == existing().childId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidChatMessage(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['isRead']);
+      allow delete: if isSignedIn() && existing().parentId == request.auth.uid;
+    }
+
+    match /location_requests/{requestId} {
+      allow get: if isSignedIn() &&
+                    (resource.data.parentId == request.auth.uid || resource.data.childId == request.auth.uid);
+      allow list: if isSignedIn() &&
+                     (resource.data.parentId == request.auth.uid || resource.data.childId == request.auth.uid);
+      allow create: if isSignedIn() &&
+                       incoming().parentId == request.auth.uid &&
+                       isValidLocationRequest(incoming());
+      allow update: if isSignedIn() &&
+                       (existing().parentId == request.auth.uid || existing().childId == request.auth.uid) &&
+                       incoming().parentId == existing().parentId &&
+                       incoming().childId == existing().childId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidLocationRequest(incoming());
+      allow delete: if isSignedIn() && existing().parentId == request.auth.uid;
+    }
+  }
+}

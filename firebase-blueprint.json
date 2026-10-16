@@ -1,0 +1,113 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile holding parent or member details",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string", "description": "Full name or alias" },
+        "email": { "type": "string", "description": "User email address" },
+        "role": { "type": "string", "description": "User role: parent or child" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Document creation server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update server timestamp" }
+      },
+      "required": ["userId", "displayName", "email", "role", "createdAt"]
+    },
+    "FamilyLink": {
+      "title": "FamilyLink",
+      "description": "Pairing link and state between parent and child device",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique link identifier" },
+        "parentId": { "type": "string", "description": "UID of the parent" },
+        "childId": { "type": "string", "description": "Device ID or UID of child" },
+        "childName": { "type": "string", "description": "Display name of child (e.g. Ali)" },
+        "deviceModel": { "type": "string", "description": "Model of the child device" },
+        "batteryLevel": { "type": "integer", "description": "Battery percentage 0-100" },
+        "isOnline": { "type": "boolean", "description": "Current device online status" },
+        "isSharingLocation": { "type": "boolean", "description": "Whether child location sharing is active" },
+        "locationPermissionStatus": { "type": "string", "description": "Permission level: granted, denied, foreground_only" },
+        "gpsEnabled": { "type": "boolean", "description": "Whether device GPS is enabled" },
+        "pairingCode": { "type": "string", "description": "6-digit pairing code" },
+        "status": { "type": "string", "description": "Link status: active, pending, unlinked" },
+        "lastSeen": { "type": "string", "format": "date-time", "description": "Last heartbeat timestamp" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["parentId", "childId", "childName", "pairingCode", "status", "createdAt"]
+    },
+    "LocationRecord": {
+      "title": "LocationRecord",
+      "description": "Geographical location reported by child device",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Location record ID" },
+        "parentId": { "type": "string", "description": "Parent UID" },
+        "childId": { "type": "string", "description": "Child ID" },
+        "latitude": { "type": "number", "description": "Latitude coordinate" },
+        "longitude": { "type": "number", "description": "Longitude coordinate" },
+        "accuracy": { "type": "number", "description": "Accuracy radius in meters" },
+        "provider": { "type": "string", "description": "Location provider (fused, gps, network)" },
+        "speed": { "type": "number", "description": "Speed in m/s" },
+        "recordedAt": { "type": "string", "format": "date-time", "description": "Time location was captured" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server write timestamp" }
+      },
+      "required": ["parentId", "childId", "latitude", "longitude", "accuracy", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Secure text message between parent and child",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Message ID" },
+        "parentId": { "type": "string", "description": "Parent UID" },
+        "childId": { "type": "string", "description": "Child ID" },
+        "senderType": { "type": "string", "description": "parent or child" },
+        "text": { "type": "string", "description": "Message text payload" },
+        "isRead": { "type": "boolean", "description": "Read receipt status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Message send timestamp" }
+      },
+      "required": ["parentId", "childId", "senderType", "text", "createdAt"]
+    },
+    "LocationRequest": {
+      "title": "LocationRequest",
+      "description": "Location update request sent by parent to child device",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Request ID" },
+        "parentId": { "type": "string", "description": "Parent UID" },
+        "childId": { "type": "string", "description": "Target Child ID" },
+        "status": { "type": "string", "description": "pending, fulfilled, rejected, gps_disabled, permission_denied" },
+        "message": { "type": "string", "description": "Optional parent note" },
+        "requestedAt": { "type": "string", "format": "date-time", "description": "Request creation timestamp" },
+        "fulfilledAt": { "type": "string", "format": "date-time", "description": "Response timestamp" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
+      },
+      "required": ["parentId", "childId", "status", "requestedAt", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles restricted to owning authenticated user"
+    },
+    "/family_links/{linkId}": {
+      "schema": "FamilyLink",
+      "description": "Family links pairing parent with child devices"
+    },
+    "/locations/{locationId}": {
+      "schema": "LocationRecord",
+      "description": "Location breadcrumbs and updates sent by child"
+    },
+    "/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Secure in-app chat messages between parent and child"
+    },
+    "/location_requests/{requestId}": {
+      "schema": "LocationRequest",
+      "description": "Real-time location requests initiated by parent"
+    }
+  }
+}
